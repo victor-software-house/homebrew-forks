@@ -4,9 +4,9 @@
 class Tmux < Formula
   desc "Terminal multiplexer (jixiuf fork — kitty keyboard protocol)"
   homepage "https://github.com/jixiuf/tmux"
-  url "https://github.com/jixiuf/tmux/archive/e6c66eaad4ffec42092787b7261b9a79bfed5380.tar.gz"
-  version "next-3.7-e6c66ea"
-  sha256 "f787cda250bc52c5d77a985a38b5d61d8985f35e68a4aff2d65e93b0996c234d"
+  url "https://github.com/jixiuf/tmux/archive/.tar.gz"
+  version "next-3.7-"
+  sha256 "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5"
   license "ISC"
   head "https://github.com/jixiuf/tmux.git", branch: "master"
 
