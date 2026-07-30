@@ -5,43 +5,101 @@ on:
     - cron: "0 6 * * *" # daily at 06:00 UTC
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check latest jixiuf/tmux commit
+      # The API call is authenticated because the unauthenticated GitHub API is
+      # rate limited per runner IP. A throttled call used to return an empty
+      # body, `jq -r .sha` turned that into an empty string, and the change
+      # guard below compared "" against the pinned commit, decided they
+      # differed, and wrote `/archive/.tar.gz` into the formula along with the
+      # sha256 of GitHub's 404 body. Validate the value instead of trusting it.
+      - name: Resolve latest jixiuf/tmux commit
         id: upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          COMMIT=$(curl -sf https://api.github.com/repos/jixiuf/tmux/commits/master | jq -r .sha)
-          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
-      - name: Read current pinned commit
+          COMMIT=$(gh api repos/jixiuf/tmux/commits/master --jq .sha)
+
+          if [[ ! $COMMIT =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::refusing to continue: resolved commit is not a 40-char sha (got '${COMMIT}')"
+            exit 1
+          fi
+
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Read currently pinned commit
         id: current
         run: |
+          set -euo pipefail
+
           CURRENT=$(grep -oP '(?<=/archive/)[0-9a-f]{40}(?=\.tar\.gz)' Formula/tmux.rb)
-          echo "commit=$CURRENT" >> $GITHUB_OUTPUT
+
+          if [[ ! $CURRENT =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::formula is not pinned to a valid commit — repair Formula/tmux.rb by hand"
+            exit 1
+          fi
+
+          echo "commit=$CURRENT" >> "$GITHUB_OUTPUT"
 
       - name: Update formula if commit changed
         if: steps.upstream.outputs.commit != steps.current.outputs.commit
         env:
           COMMIT: ${{ steps.upstream.outputs.commit }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           SHORT=${COMMIT:0:7}
           URL="https://github.com/jixiuf/tmux/archive/${COMMIT}.tar.gz"
 
-          curl -sL -o /tmp/tmux-src.tar.gz "$URL"
+          # -f so a 404 is a failure rather than a hashed error page.
+          curl -fsSL -o /tmp/tmux-src.tar.gz "$URL"
+
+          # A truncated or HTML response would still hash cleanly, so assert the
+          # payload really is the source tarball before trusting its digest.
+          if ! gzip -t /tmp/tmux-src.tar.gz; then
+            echo "::error::downloaded artifact is not valid gzip"
+            exit 1
+          fi
+          if ! tar tzf /tmp/tmux-src.tar.gz | grep -q "^tmux-${COMMIT}/configure.ac$"; then
+            echo "::error::tarball does not look like the tmux source tree"
+            exit 1
+          fi
+
           SHA256=$(sha256sum /tmp/tmux-src.tar.gz | awk '{print $1}')
 
-          # Bump version string to next-3.7-<short sha>
+          # Derive the base version from the source rather than hardcoding it.
+          # The fork continuously rebases on upstream, so it silently moved from
+          # next-3.7 to next-3.8; a hardcoded prefix mislabels every build after
+          # such a bump. AC_INIT's second argument appears both bracketed and
+          # bare across revisions, so accept either.
+          tar xzf /tmp/tmux-src.tar.gz -O "tmux-${COMMIT}/configure.ac" > /tmp/configure.ac
+          BASE=$(sed -n 's/^AC_INIT(\[tmux\], *\[\{0,1\}\([^],)]*\).*/\1/p' /tmp/configure.ac | head -1)
+
+          if [[ ! $BASE =~ ^[0-9a-zA-Z.-]+$ ]]; then
+            echo "::error::could not parse tmux version from configure.ac (got '${BASE}')"
+            exit 1
+          fi
+
           sed -i "s|/archive/[0-9a-f]\{40\}\.tar\.gz|/archive/${COMMIT}.tar.gz|" Formula/tmux.rb
-          sed -i "s|version \".*\"|version \"next-3.7-${SHORT}\"|" Formula/tmux.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" Formula/tmux.rb
+          sed -i "s|^  version \".*\"|  version \"${BASE}-${SHORT}\"|" Formula/tmux.rb
+          sed -i "s|^  sha256 \".*\"|  sha256 \"${SHA256}\"|" Formula/tmux.rb
+
+          # Never push a formula the edits did not fully land in.
+          grep -q "/archive/${COMMIT}.tar.gz" Formula/tmux.rb
+          grep -q "${BASE}-${SHORT}" Formula/tmux.rb
+          grep -q "${SHA256}" Formula/tmux.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/tmux.rb
-          git commit -m "tmux: bump to ${SHORT}"
+          git commit -m "tmux: bump to ${BASE}-${SHORT}"
           git push
