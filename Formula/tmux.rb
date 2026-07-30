@@ -32,6 +32,7 @@ class Tmux < Formula
       --prefix=#{prefix}
       --enable-utf8proc
       --enable-jemalloc
+      --enable-sixel
     ]
 
     ENV.prepend_path "PKG_CONFIG_PATH", "#{formula_opt_lib("jemalloc")}/pkgconfig"
