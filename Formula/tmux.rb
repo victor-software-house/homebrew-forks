@@ -4,9 +4,25 @@
 class Tmux < Formula
   desc "Terminal multiplexer (jixiuf fork — kitty keyboard protocol)"
   homepage "https://github.com/jixiuf/tmux"
-  url "https://github.com/jixiuf/tmux/archive/f0703fe099cbc82838a7a73cf981b1a1bd2be3d3.tar.gz"
-  version "next-3.8-f0703fe"
-  sha256 "d4d744149e53622f4f26bf831a2dd981e5562e8050eaf8b81d3617895e62a74a"
+  # PINNED to a next-3.7 base on purpose — do not bump to a next-3.8 base.
+  #
+  # Upstream tmux 3.8 breaks iTerm2's control mode (`tmux -CC`): the window never
+  # opens and iTerm2 times out after 5s. Verified by A/B on this machine with three
+  # identically-built binaries:
+  #
+  #   next-3.7 + fork kitty patches      -> -CC works
+  #   next-3.8 + fork kitty patches      -> -CC hangs
+  #   next-3.8 clean upstream, no patches -> -CC hangs
+  #
+  # So it is upstream, not the fork. tmux/tmux#5135 is the live discussion; the
+  # maintainer's position is that old iTerm2 versions cannot handle 3.8's floating
+  # panes and that clients must opt into a new `new-layouts` flag, which is not in
+  # master yet. iTerm2 3.6.11 (current stable) and 3.7.0beta7 both lack it.
+  #
+  # Revisit when iTerm2 ships new-layouts support, then move to a 3.8 base.
+  url "https://github.com/jixiuf/tmux/archive/78052127d83e317bee59b9c07e4de54b6b89851c.tar.gz"
+  version "next-3.7-7805212"
+  sha256 "d5d6a17711dfb92c8c94bf996e2fa696e0da021ea1862b5dacabf3cfa49f22f9"
   license "ISC"
   head "https://github.com/jixiuf/tmux.git", branch: "master"
 

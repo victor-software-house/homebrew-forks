@@ -1,9 +1,21 @@
 name: Update tmux formula
 
+# FROZEN. The daily schedule is deliberately disabled; run it by hand only.
+#
+# jixiuf/tmux master rebases onto upstream tmux master, which is now next-3.8,
+# and upstream 3.8 breaks iTerm2 control mode (`tmux -CC` never opens a window).
+# An unattended daily bump therefore reliably breaks the operator's terminal.
+# See the pin comment in Formula/tmux.rb for the A/B that established this.
+#
+# Before re-enabling: confirm iTerm2 ships tmux `new-layouts` support, then
+# either restore the schedule or point the resolver at a 3.7-tracking ref.
 on:
-  schedule:
-    - cron: "0 6 * * *" # daily at 06:00 UTC
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "jixiuf/tmux ref to pin (branch, tag or sha). Default master is a next-3.8 base."
+        required: false
+        default: "master"
 
 permissions:
   contents: write
@@ -24,10 +36,13 @@ jobs:
         id: upstream
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Override when bumping deliberately. Defaults to master, which is a
+          # next-3.8 base and currently known to break iTerm2 -CC.
+          TMUX_REF: ${{ inputs.ref || 'master' }}
         run: |
           set -euo pipefail
 
-          COMMIT=$(gh api repos/jixiuf/tmux/commits/master --jq .sha)
+          COMMIT=$(gh api "repos/jixiuf/tmux/commits/${TMUX_REF}" --jq .sha)
 
           if [[ ! $COMMIT =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::refusing to continue: resolved commit is not a 40-char sha (got '${COMMIT}')"
