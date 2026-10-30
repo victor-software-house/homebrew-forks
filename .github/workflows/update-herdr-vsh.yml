@@ -1,0 +1,72 @@
+name: Update herdr-vsh cask
+
+# Points Casks/herdr-vsh.rb at the newest Herdr VSH release
+# (victor-software-house/herdr-app, tags vsh-v<version>-<n>), with the sha256
+# of its Herdr-VSH.pkg. Runs every six hours and by hand.
+# main takes changes only through a pull request (org ruleset), and the
+# enterprise forbids GITHUB_TOKEN from opening one, so the bump opens and
+# merges its pull request as the Version Packages App.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-herdr-vsh
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint the bump token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.CHANGESET_VERSION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CHANGESET_VERSION_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Bump the cask if a newer release exists
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view -R victor-software-house/herdr-app --json tagName --jq .tagName)
+          if [[ ! $tag =~ ^vsh-v([0-9]+(\.[0-9]+)+-[0-9]+)$ ]]; then
+            echo "::error::latest release tag is not vsh-v<version>-<n> (got '${tag}')"
+            exit 1
+          fi
+          version=${BASH_REMATCH[1]}
+          if grep -q "^  version \"${version}\"$" Casks/herdr-vsh.rb; then
+            echo "already at ${version}"
+            exit 0
+          fi
+          # The release's own digest, checked against the downloaded file.
+          gh release download "$tag" -R victor-software-house/herdr-app -p Herdr-VSH.pkg -D "$RUNNER_TEMP"
+          sha=$(sha256sum "$RUNNER_TEMP/Herdr-VSH.pkg" | cut -d' ' -f1)
+          digest=$(gh release view "$tag" -R victor-software-house/herdr-app --json assets --jq '.assets[] | select(.name == "Herdr-VSH.pkg") | .digest')
+          if [[ $digest != "sha256:${sha}" ]]; then
+            echo "::error::Herdr-VSH.pkg digest ${digest} does not match the download (${sha})"
+            exit 1
+          fi
+          sed -i "s|^  version \".*\"$|  version \"${version}\"|; s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" Casks/herdr-vsh.rb
+          grep -q "^  version \"${version}\"$" Casks/herdr-vsh.rb
+          grep -q "^  sha256 \"${sha}\"$" Casks/herdr-vsh.rb
+          branch="bump/herdr-vsh-${version}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add Casks/herdr-vsh.rb
+          git commit -m "herdr-vsh: bump to ${version}"
+          git push --force origin "$branch"
+          gh pr create --head "$branch" --title "herdr-vsh: bump to ${version}" \
+            --body "Herdr VSH ${tag}: https://github.com/victor-software-house/herdr-app/releases/tag/${tag}"
+          gh pr merge "$branch" --squash --delete-branch
