@@ -18,7 +18,7 @@ brew tap victor-software-house/forks
 
 | Cask | Description | Upstream |
 |:-----|:------------|:---------|
-| `herdr-vsh` | [Herdr VSH](https://github.com/victor-software-house/herdr-app), the Herdr desktop app with Ghostty-like terminal rendering | [herdrdev/herdr-app](https://github.com/herdrdev/herdr-app) |
+| `herdr-vsh` | [Herdr VSH](https://github.com/victor-software-house/herdr-vsh), the Herdr desktop app with Ghostty-like terminal rendering | [herdrdev/herdr-app](https://github.com/herdrdev/herdr-app) |
 
 `.github/workflows/update-herdr-vsh.yml` moves the cask to each new release every six hours.
 
