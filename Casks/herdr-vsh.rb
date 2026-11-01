@@ -1,6 +1,6 @@
 cask "herdr-vsh" do
-  version "0.1.9-2"
-  sha256 "548cde27f8c3644cf0ac0ff5050027cc4aacd6471a818780e30412a28d5280b5"
+  version "0.1.11-1"
+  sha256 "44d2a23b34f17bce66caeaa8b4b888f4197827842dc8567d22ab575068b11211"
 
   url "https://github.com/victor-software-house/herdr-vsh/releases/download/vsh-v#{version}/Herdr-VSH.pkg"
   name "Herdr VSH"
