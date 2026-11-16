@@ -1,0 +1,35 @@
+# Changes here will be overwritten by Copier; edit with `copier update --data`.
+_commit: v0.0.115
+_src_path: https://github.com/victor-software-house/templates.git
+ci_runner: github-hosted
+default_branch: main
+generated_paths: []
+github_owner: victor-software-house
+linux_image: ubuntu-26.04
+merge_queue: false
+merge_queue_cancel_lower: true
+mise_version: 2026.11.6
+pieces:
+- hooks
+- lint_markdown
+- lint_toml
+- lint_typos
+- lint_prose
+- ci
+- drift_check
+pieces_extra:
+- lint_workflows
+platforms:
+- linux-x64
+- macos-arm64
+project: homebrew-tap
+prose_fail_level: error
+repository_visibility: public
+workflow_policy:
+- drafts
+- concurrency
+- labels
+- permissions
+- pins
+- mise_env
+workflow_policy_namespaces: []

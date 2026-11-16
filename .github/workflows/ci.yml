@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+# The tap check reads only the repository.
+permissions:
+  contents: read
+
+concurrency:
+  # A draft run gets a group of its own, so it never cancels the ready run.
+  group: >-
+    ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number ||
+    github.ref_name }}${{ github.event.pull_request.draft && '-draft' || '' }}
+  cancel-in-progress: true
+
+jobs:
+  tap:
+    if: ${{ !github.event.pull_request.draft }}
+    permissions:
+      contents: read
+    uses: victor-software-house/actions/.github/workflows/homebrew-tap-ci.yml@cb43721495406000501e460309abc1cf9f899cf7 # main, 2026-11-16
+    with:
+      runner: ubuntu-26.04
