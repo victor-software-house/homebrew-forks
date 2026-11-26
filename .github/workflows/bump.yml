@@ -1,0 +1,58 @@
+name: Bump
+
+# Points a cask at a release of its app.
+# A release job sends a repository_dispatch of type release.
+# Its payload has four values: the cask, the tag, the repository of the release
+# and its asset. A manual run takes the same four values.
+#
+# The shared workflow checks the digest of the asset. It then opens and
+# auto-merges the pull request as the Version Packages App.
+# The default branch takes changes only through a pull request.
+on:
+  repository_dispatch:
+    types: [release]
+  workflow_dispatch:
+    inputs:
+      cask:
+        description: The cask to bump, Casks/<cask>.rb
+        type: string
+        required: true
+      tag:
+        description: The release tag, such as v0.0.1
+        type: string
+        required: true
+      repository:
+        description: The release's repository, as owner/name
+        type: string
+        required: true
+      asset:
+        description: The release asset's file name
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# A newer release of a cask supersedes a bump still running for it.
+# Casks do not wait on each other.
+# The shared workflow queues its own runs in a group of its own.
+# A "-caller" suffix keeps this group apart from it.
+concurrency:
+  group: ${{ github.workflow }}-caller-${{ github.event.client_payload.cask || inputs.cask }}
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    permissions:
+      contents: read
+    uses: victor-software-house/actions/.github/workflows/homebrew-bump.yml@e9cf7ef0da4f4a9a7a6f978f5dd54be0d0d539bc # main, 2026-11-26
+    with:
+      cask: ${{ github.event.client_payload.cask || inputs.cask }}
+      tag: ${{ github.event.client_payload.tag || inputs.tag }}
+      source-repository: ${{ github.event.client_payload.repository || inputs.repository }}
+      asset: ${{ github.event.client_payload.asset || inputs.asset }}
+      runner: ubuntu-26.04
+    secrets:
+      CHANGESET_VERSION_APP_CLIENT_ID: ${{ secrets.CHANGESET_VERSION_APP_CLIENT_ID }}
+      CHANGESET_VERSION_APP_PRIVATE_KEY: ${{ secrets.CHANGESET_VERSION_APP_PRIVATE_KEY }}
+
